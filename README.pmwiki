@@ -1,0 +1,398 @@
+﻿>>recipeinfo<<
+Summary:{$Description}
+Version:2007-06-26
+Prerequisites:PmWiki 2.2beta, may work with 2.1.27 but not tested
+Status:beta
+Maintainer:[[~Kathryn Andersen]]
+Categories: [[!markup]], [[!links]], [[!hierarchy]]
+File:Attach:cluster.php
+(:if exists [[{$Name}-Talk]]:)Discussion: [[{$Name}-Talk]](:if:)
+>><<
+!! Questions answered by this recipe
+
+How can I cluster my wiki-groups so they behave like a hierarchy of groups?
+
+!!Description
+(:Description Group-clustering recipe.:){$Description}
+
+This recipe enables wiki-pages to be clustered, so that they can share and inherit common information:
+* group headers
+* group footers
+* group attributes
+* config files
+* CSS style sheets 
+
+This also provides useful page-variables, and link short-cuts.
+
+!!!Activation
+
+To activate this recipe, download Attach:cluster.php and put it into your cookbook directory.
+Add the following line to your local/config.php:
+
+[@
+include_once("$FarmD/cookbook/cluster.php");
+@]
+
+!!!Configuration variables
+
+These can be set in local/config.php
+
+||table border="1"
+||'''Name'''||'''Description'''||'''Default'''||
+||$ClusterSeparator||Define the character used to separate the different parts of a group name||'-'||
+||$ClusterMaxLevels||Define the maximum number of levels to split group names by||7||
+||$ClusterBreadCrumbSeparator||Define the string used to separate the different parts of a breadcrumb-trail in the $BreadCrumb page-variable (See [[#BreadCrumb|Using the BreadCrumb]] below)||' - '||
+||$ClusterEnableBreadCrumbName||If true, this will append the name of the page to the $BreadCrumb page-variable; if false, it will only make a breadcrumb from the group (See [[#BreadCrumb|Using the BreadCrumb]] below)||true||
+||$ClusterEnableTitles||If true, this will use titles for the labels of the links in [=(:clusterslice:)=] and $BreadCrumb page-variable; if false, it will use names (See [[#BreadCrumb|Using the BreadCrumb]] below)||false||
+||$ClusterEnableSpaces||If true, this will use spaced names for the labels of the links in [=(:clusterslice:)=] and $BreadCrumb page-variable; if false, it will use names (See [[#BreadCrumb|Using the BreadCrumb]] below)||false||
+||$ClusterEnableNameClustering||If true, this will cluster on page-names as well as group-names; if false, only groups are clustered. ||false||
+||$GroupTitlePathFmt||The path to search for group titles.||[=array('$Group.GroupAttributes', '$Group.GroupHeader', '$Group.GroupFooter', '$Group.Group', "\$Group.$DefaultName")=]||
+
+!!!How The Clustering Works
+
+Let's use the common Kingdom-Animal-Canine example.  Suppose you have a group called Kingdom,
+another group called Kingdom-Animal, another called Kingdom-Animal-Canine, and another called Kingdom-Plant.
+
+!!!!Pages
+
+Group headers, group footers and group attributes pages will be searched for from the specific to the general.
+The first page found will be the one that is used.
+
+For example, if Kingdom-Animal-Canine.GroupHeader and Kingdom.GroupHeader exist, then if one is in the
+Kingdom-Animal-Canine group, then Kingdom-Animal-Canine.GroupHeader will be used, but if one is in the
+Kingdom-Plant group then Kingdom.GroupHeader will be used.
+
+Likewise for GroupFooter and GroupAttributes.
+
+!!!!Configuration files
+
+Configuration files are also searched for from the specific to the general, and, again, the first one 
+found will be the one used.
+
+Suppose local/Kingdom.php and local/Kingdom-Animal-Canine.Dog.php exist.
+
+When on the Kingdom-Animal.HomePage page, the Kingdom.php config will be used.
+
+When on the Kingdom-Animal-Canine.Dog page, the Kingdom-Animal-Canine.Dog.php
+config file will be used -- and the Kingdom.php config file will NOT be used.
+If you want to "inherit" the settings from Kingdom.php, then you would add
+
+	include_once("$LocalDir/Kingdom.php");
+
+to the Kingdom-Animal-Canine.Dog.php file.
+
+!!!!CSS style sheets
+
+CSS style sheets follow the same pattern, but all stylesheets are included, since Cascading Style Sheets have inheritance built-in.
+
+Suppose pub/css/local.css, pub/css/Kingdom.css and pub/css/Kingdom-Animal-Canine.css exist.
+
+On the Kingdom-Animal.HomePage page, the CSS sheets will be local.css and Kingdom.css.
+On the Kingdom-Animal-Canine.HomePage page, the CSS sheets will be local.css, Kingdom.css and Kingdom-Animal-Canine.css.
+
+!!!!Name-based clustering
+
+If $ClusterEnableNameClustering is true, then clustering is done on page names as well as group names.  This uses the same separator ('-' by default) as for group-based clustering.
+
+For example, if you have these pages:
+* Kingdom-Animal-Canine.Dog
+* Kingdom-Animal-Canine.Dog-Terrier
+* Kingdom-Animal-Canine.Dog-Terrier-WestHighland
+
+When name-based clustering is enabled, you could, for example, have a special "GroupHeader" for Terriers; it would be called 
+Kingdom-Animal-Canine.Dog-Terrier-GroupHeader
+and would affect the pages
+Kingdom-Animal-Canine.Dog-Terrier and
+Kingdom-Animal-Canine.Dog-Terrier-WestHighland
+
+!!!!More examples
+
+See http://www.katspace.org/kriki/Kingdom/ for some live examples.
+
+!!!Link Shortcuts
+
+Three kinds of link-shortcuts are provided, when making [=[[links]]=]:
+* absolute '*'
+* relative ancestor '^'
+* relative descendant '-'
+
+||table border=1
+||'''Examples''' ||Current page is Kingdom-Animal-Canine.||
+||@@               Kingdom@@ (grandparent): ||[@[[^^.]]@] or [@[[*.]]@] ||
+||@@               +-Plant@@ (uncle):       ||[@[[^^-Plant.]]@] or [@[[*-Plant.]]@] ||
+||@@               | +-Grass@@ (cousin):    ||[@[[^^-Plant.Grass]]@] ||
+||@@               +-Animal@@ (parent):     ||[@[[^.]]@] ||
+||@@&nbsp;           +-Canine@@ (self):     ||[@[[-]]@] ||
+||@@&nbsp;           | +-Terrier@@ (child-page): ||[@[[Terrier]]@] ||
+||@@&nbsp;           +-Feline@@ (sibling):  ||[@[[^-Feline.]]@] ||
+||@@&nbsp;&nbsp;&nbsp; +-Cat@@ (nephew):    ||[@[[^-Feline.Cat]]@] ||
+||Absolute link (to Canine):                ||[@[[***.]]@] ||
+||'''Examples''' ||Current page is Kingdom-Animal.||
+||@@&nbsp;           +-Feline@@ (child-group):  ||[@[[-Feline.]]@] ||
+||@@&nbsp;&nbsp;&nbsp; +-Cat@@ (grandchild):    ||[@[[-Feline.Cat]]@] ||
+
+!!!Page Variables
+
+:$BreadCrumb:A "breadcrumb-trail" which links to all the intermediate groups related to this group-cluster.  See [[#BreadCrumb|Using the BreadCrumb]] below.
+:$BreadCrumbTitle:A "breadcrumb-trail" which links to all the intermediate groups related to this group-cluster; this uses page titles instead of names in the links.  See [[#BreadCrumb|Using the BreadCrumb]] below.
+:$BreadCrumbNoTitle:A "breadcrumb-trail" which links to all the intermediate groups related to this group-cluster; this uses names in the links.  See [[#BreadCrumb|Using the BreadCrumb]] below.
+:$BreadCrumbDepth:The number of levels in the current group (the same as $g0).
+:$ClusterSep:The cluster separator.
+:$ClusterBreadCrumbSep:The BreadCrumb separator.
+:$ClusterMaxLevels:The same as the $ClusterMaxLevels configuration setting.
+:$ClusterSideBar:The name of the sidebar page that should be associated with this page.  See [[#SideBar|Using the SideBar]] below.
+:$ClusterRightBar:The name of the right-bar page that should be associated with this page.  See [[#SideBar|Using the SideBar]] below.
+:$g0:The number of levels in the given group
+:$g01:The number of levels in the given group, plus one.
+:$g1:The first part of the group name
+:$g7:The 7th part of the group name (if it exists)
+:$n0:The number of levels in the given page name ($PageName, not $FullName)
+:$n1:The first part of the page name
+:$n7:The 7th part of the page name (if it exists)
+:$GroupTitle:The title of a group (as in [[Cookbook/GroupTitle]]) but also if no $Title has been given for a group, it takes the last part of the group name as the group title.
+:$GroupTitlespaced:as above, but spaced
+
+!!![[#Directives]]Directives
+
+To enable more fine-grained control of both links and titles, the [=(:clusterslice:)=] directive is provided.
+Cluster-slice provides a "slice" of the "clustered" page-name, with options to return links, names or titles of the segments of the cluster.
+
+(:markup:)
+(:clusterslice:)
+(:markupend:)
+
+Options:
+||'''Name'''||'''Description'''||'''Default'''||
+||start||Where to start.  If start is non-negative, the returned slice will start at the start'th position in the cluster, counting from zero. If start is negative, the returned slice will start at the start'th segment from the end of the cluster.||0||
+||length||Length of the slice. If length is given and is positive, the slice returned will contain at most ''length'' segments beginning from ''start'' (depending on the length of the cluster).  If the cluster is less than or equal to ''start'' segments long, an empty string will be returned.  If length is given and is negative, then that many segments will be omitted from the end of the slice (after the start position has been calculated).  If ''start'' denotes a position beyond this truncation, an empty string will be returned.||0||
+||separator||Separator to use between breadcrumb elements||$ClusterBreadCrumbSeparator||
+||title||Use titles as labels (if we are returning links)||$ClusterEnableBreadCrumbTitles||
+||space||Use spaced names as labels||$ClusterEnableBreadCrumbSpaced||
+||name||Include the name part of the page as part of the slice.  There are three possible values for this: 'false', 'simple' and 'clustered'.  The 'clustered' option treats the name as clustered; the 'simple' option treats the name as one simple segment, and 'false' doesn't include the name at all.||$ClusterEnableNameClustering -> 'clustered', $ClusterEnableBreadCrumbName -> 'simple', otherwise false||
+||noindex||If the name is included, if ''noindex'' is true, then the name will not be included if the page is an index-page, that is, the HomePage of a group. ||$ClusterEnableBreadCrumbName||
+||return||What to return.  There are three possible values for this: 'links', 'groups' or 'names'. The 'links' option returns links, the 'groups' option returns the group names, and the 'names' option returns what the groups are called (the labels).||links||
+||pagename||To make this even more flexible, you can pass in the pagename to use, rather than using the current page name.||current page||
+
+Note: The ''start'' and ''length'' options are based on that of the ''substr'' PHP function.
+
+!!![[#BreadCrumb]]Using the BreadCrumb
+
+The $BreadCrumb page-variable creates a breadcrumb-trail.
+
+To use it, put in your Group.GroupHeader page:
+
+[@{*$BreadCrumb}@]
+
+This will display the breadcrumb trail at the top of pages in that group.
+
+So what is a breadcrumb-trail?  Here's an example.
+If you are on the Kingdom-Animal-Feline.Cat page, the breadcrumb trail that is put into the $BreadCrumb variable would be:
+
+(:markup:)
+[[Kingdom/|Kingdom]] - [[Kingdom-Animal/|Animal]] - [[Kingdom-Animal-Feline/|Feline ]] - '''Cat'''
+(:markupend:)
+
+The ' - ' used as a separator can be changed by setting $ClusterBreadCrumbSeparator to the desired separator.  For example:
+
+[@$ClusterBreadCrumbSeparator = ' > ';@]
+
+This would give
+
+(:markup:)
+[[Kingdom/|Kingdom]] > [[Kingdom-Animal/|Animal]] > [[Kingdom-Animal-Feline/|Feline ]] > '''Cat'''
+(:markupend:)
+
+If $ClusterEnableBreadCrumbName is false, then the name of the page is not
+included in the breadcrumb.
+
+(:markup:)
+[[Kingdom/|Kingdom]] - [[Kingdom-Animal/|Animal]] - [[Kingdom-Animal-Feline/|Feline ]]
+(:markupend:)
+
+The $BreadCrumbTitle page-variable creates a breadcrumb-trail where instead
+of using the name of the group, it uses the title in the link label.
+
+To use it, put in your Group.GroupHeader page:
+
+[@{*$BreadCrumbTitle}@]
+
+The $BreadCrumbNoTitle page-variable creates a breadcrumb-trail where 
+it always uses the name in the link label.
+
+To use it, put in your Group.GroupHeader page:
+
+[@{*$BreadCrumbNoTitle}@]
+
+!!![[#SideBar]]Using the SideBar
+
+In order to take advantage of the SideBar and RightBar clustering, you need to edit your skin template.
+
+A normal skin template would have something like this:
+
+[@<!--wiki:{$Group}.SideBar {$SiteGroup}.SideBar-->@]
+
+What Cluster does is give you an additional page-variable, so you can go
+
+[@<!--wiki:{$ClusterSideBar} {$Group}.SideBar {$SiteGroup}.SideBar-->@]
+
+instead.
+
+The $ClusterSideBar page-variable will be set to the appropriate side-bar for
+the current group, doing the search in the same kind of way that
+GroupHeader or GroupFooter etc are searched for.
+
+That is, you create a Side Bar for the Top Level Group of the cluster, it will
+be applied to all "Child" groups through the Custer.
+
+So, for example, if you create Kingdom.SideBar, it will be used not only for all pages in the "Kingdom" group, but all pages in the "Kingdom-Animal" and
+"Kingdom-Plant" groups.
+
+Likewise the $ClusterRightBar page-variable should be used in skins that
+have a RightBar; for example:
+
+[@<!--wiki:{$ClusterRightBar} {$Group}.RightBar {$SiteGroup}.RightBar-->@]
+
+!!!Functions
+
+For skin writers, there is a function '''ClusterPageName''' which can be used to make general page variables to find suitable "clustered" pages in the same way that $ClusterSideBar does.
+
+The page-variable declaration for $ClusterSideBar is:
+
+[@
+$FmtPV['$ClusterSideBar'] = 'ClusterPageName($group, "SideBar", $name)';
+@]
+
+Arguments:
+:group:The group (group-cluster) to look for matching pages.
+:sought_name:The name of the page to look for.
+:curr_name:(optional) The name (name-cluster) to look for matching pages.  This is only used if $ClusterEnableNameClustering is true.
+
+So, if, for example, you want to make a $ClusterMenuBar variable, which looks for MenuBar pages, you would use the following:
+
+[@
+$FmtPV['$ClusterMenuBar'] = 'ClusterPageName($group, "MenuBar", $name)';
+@]
+
+To make sure that this still works even if Cluster isn't installed,
+you would do something like this:
+
+[@
+if (function_exists('ClusterPageName')) {
+    $FmtPV['$ClusterMenuBar'] = 'ClusterPageName($group, "MenuBar", $name)';
+}
+@]
+
+!!!Limitations
+
+This does not give Kingdom/Animal/Canine style links; it is only limited to clustering configuration and pages.  It does not
+provide a full "hierarchical groups" facility.
+
+!!Tips
+
+!!!Page Lists
+
+The $gN page variables are very useful in making hierarchical menus
+to use in your sidebar.  The following is an example of one.
+(Note that this pagelist template is usable in PmWiki version 2.2beta36 or
+greater.)
+
+'''fmt=#hgtitle2'''
+
+Two-level list of groups (showing title), giving nested hierarchical groups of top two levels.
+
+[@
+[[#hgtitle2]]
+(:template defaults order=group list=group:)
+(:template first {=$g1}:)
+(:if equal "{=$g0}" "1" ):)
+*[[{=$Group}.|{=$GroupTitle}]]
+(:ifend:)
+(:template first {=$g2}:)
+(:if ( equal "{=$g1}" "{*$g1}" and equal "{=$g0}" "2" ) :)
+**[[{=$Group}.|{=$GroupTitle}]]
+(:ifend:)
+[[#hgtitle2end]]
+@]
+
+Note that the "group" list used by this is a custom $SearchPatterns pattern.
+
+[@
+#make a group-only Group.Group/Group.HomePage search pattern
+$SearchPatterns['group'][] = '/([-\w]+)\.\1$|\.' . "$DefaultName" . '$/';
+@]
+
+----
+'''fmt=#currentclusterdesc'''
+
+This uses the $g01 variable.
+Devised by Kathryn Andersen and Feral.
+
+[@
+[[#currentclusterdesc]]
+(:template defaults order=group list=group:)
+(:template first {=$Group}:)
+(:if equal "{=$g0}" "{*$g01}" :)
+*[[{=$Group}|{=$GroupTitlespaced}]]
+(:if ( equal "{=$g0}" "{*$g01}" and !equal "{{=$Group}$Description}" "" ) :)
+->'-%smaller italic small-caps%Description:%% {{=$Group}$Description}-'
+(:ifend:)
+[[#currentclusterdesc]]
+@]
+
+----
+
+'''fmt=#clustertrail1'''
+
+Dynamic group trail of form <<prev.Title | $n1 | next.Title>>; useful for name-based clustering.
+
+[@
+[[#clustertrail1]]
+(:if equal {*$FullName} {=$FullName}:)<<[[{<$FullName}|{<$Title}]] | [[{=$Group}.{=$n1}|{=$n1}]] | [[{>$FullName}|{>$Title}]]>>(:ifend:)
+[[#clustertrail1end]]
+@]
+
+!! Notes
+
+This is very similar to [[Cookbook.Hg]] because we have used each others' code. See [[Hierarchical Groups]] for differences.
+
+!! Release Notes
+* (2007-06-26) bug fixes with ClusterSlice function.
+* (2007-06-17) bug fixes with ClusterPageName function.
+* (2007-05-27) Large rewrite:
+** Now optionally clusters on names as well as groups.
+** changed internals partly based on Feral's ClusterSlice, but the arguments are based on "substr".
+** The [=(:breadcrumb:)=] and [=(:clustergrouptitle:)=] have both been replaced by the [=(:clusterslice:)=] directive.
+* (2007-04-27) Bug fix for link shortcut markup.
+* (2007-03-25) Merged in a number of Feral's and HansB's improvements:
+** Configuration Variables:
+*** added $ClusterEnableBreadCrumbName, $ClusterEnableBreadCrumbTitles, $ClusterEnableBreadCrumbSpaced, $GroupTitlePathFmt (was there before, but now documented)
+** Page Variables:
+*** renamed $SideBar and $RightBar to $ClusterSideBar and $ClusterRightBar
+*** added $BreadCrumbTitle, $BreadCrumbNoTitle, $BreadCrumbDepth
+** Directives:
+*** added [@(:breadcrumb:)@] and [@(:clustergrouptitle:)@] directives
+** Functions:
+*** Generic ClusterPageName function which can be used to create PageVariables for skins.
+* (2007-03-16) Merged in Feral's fixes.  Adapted Feral's improvements:
+** [=(:clusterbreadcrumbs:)=] became the $BreadCrumbs page variable
+*** added $ClusterBreadCrumbSeparator to make the breadcrumb more flexible
+** $ClusterRightBar became the $RightBar page variable; I didn't see a need for $clustersrightbarname (see [[#SideBar|Using the SideBar]] above)
+* (2007-02-12) Added $GroupTitle and $GroupTitlespaced.
+* (2007-02-11) initial version
+
+!! Comments
+(:if false:)
+This space is for User-contributed commentary and notes.
+Please include your name and a date along with your comment.
+Optional alternative:  create a new page with a name like "ThisRecipe-Talk" (e.g. PmCalendar-Talk).
+(:if exists [[{$Name}-Talk]]:)See Discussion at [[{$Name}-Talk]](:if:)
+
+!! See Also
+
+* [[Hierarchical Groups]]
+* [[Hg]]
+
+!! Contributors
+
+* [[~Feral]]
+* [[~HansB]]
