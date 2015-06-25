@@ -10,8 +10,9 @@
  * 	see http://www.pmwiki.org/wiki/Cookbook/Hg
  * Modified by: Kathryn Andersen
  * Contributions by Hans Bracker and Feral.
+ * File modified by Petko Yotov to work with PHP 5.5
  */
-$RecipeInfo['Cluster']['Version'] = '2007-10-05';
+$RecipeInfo['Cluster']['Version'] = '2014-05-15';
 
 /* ================================================================
  * Customisation Variables for use in local config file
@@ -23,18 +24,15 @@ SDV($ClusterEnableBreadCrumbName, 1);
 SDV($ClusterEnableTitles, false);
 SDV($ClusterEnableSpaces, false);
 SDV($ClusterEnableNameClustering, false);
-SDV($ClusterCleanUrls, false);
 
 /* ================================================================
  * script Setup
  */
-$pagename = ClusterResolvePageName($pagename);
+$pagename = ResolvePageName($pagename);
 $EnablePGCust = 0;
-//$m = preg_split('/[.\\/]/', $pagename);
-//$group = $m[0];
-//$name = $m[1];
-$group = FmtPageName('$Group', $pagename);
-$name = FmtPageName('$Name', $pagename);
+$m = preg_split('/[.\\/]/', $pagename);
+$group = $m[0];
+$name = $m[1];
 
 /* ================================================================
  * Page Variables
@@ -60,9 +58,6 @@ for ($i=0; $i < $ClusterMaxLevels; $i++) {
 	$FmtPV['$' . $namevar] = 'ClusterSplitName($name, ' . $i . ')';
 }
 
-# optional redefine of PageUrl
-$FmtPV['$PageUrl'] = 'ClusterPageUrl($group, $name)';
-
 # separators
 $FmtPV['$ClusterSep'] = '"'.$ClusterSeparator.'"';
 $FmtPV['$ClusterBreadCrumbSep'] = '"'.$ClusterBreadCrumbSeparator.'"';
@@ -87,13 +82,23 @@ $FmtPV['$ClusterRightBar'] = 'ClusterPageName($group, "RightBar", $name)';
  */
 
 # Markup for link shortcuts
-Markup('[[cluster','<links','/\\[\\[(-|[\\*\\^]+)(.*?)\\]\\]/e',
-	"ClusterLinks(\$pagename, '$1', PSS('$2'))");
+if(function_exists('Markup_e')) { # added by Petko Yotov
+  Markup_e('[[cluster','<links','/\\[\\[(-|[\\*\\^]+)(.*?)\\]\\]/',
+    "ClusterLinks(\$pagename, \$m[1], \$m[2])");
 
-Markup('clusterslice', 'directives',
-	'/\\(:clusterslice\\s*(.*?):\\)/ei',
-	"ClusterSlice(\$pagename, PSS('$1'))"
-	);
+  Markup('clusterslice', 'directives', '/\\(:clusterslice\\s*(.*?):\\)/i',
+    "ClusterSlice(\$pagename, \$m[1])"
+    );
+}
+else {
+  Markup('[[cluster','<links','/\\[\\[(-|[\\*\\^]+)(.*?)\\]\\]/e',
+    "ClusterLinks(\$pagename, '$1', PSS('$2'))");
+
+  Markup('clusterslice', 'directives',
+    '/\\(:clusterslice\\s*(.*?):\\)/ei',
+    "ClusterSlice(\$pagename, PSS('$1'))"
+    );
+}
 
 /* ================================================================
  * Search Patterns
@@ -141,8 +146,8 @@ if ($ClusterEnableNameClustering) {
 		}
 		if (!$found_attr
 		    && PageExists("$group.${cluster_name}${ClusterSeparator}GroupAttributes")) {
-			$GroupAttributesFmt = "$group/${cluster_name}${ClusterSeparator}GroupAttributes";
-			$found_attr = true;
+			$GroupAttributesFmt = "$group.${cluster_name}${ClusterSeparator}GroupAttributes";
+			$found_groupfoot = true;
 		}
 		$PageCSSListFmt["pub/css/$group.$cluster_name.css"] = "$PubDirUrl/css/$group.$cluster_name.css"; 
 		array_pop($names);
@@ -166,8 +171,8 @@ while (count($groups) != 0) {
 		$found_groupfoot = true;
 	}
 	if (!$found_attr && PageExists("$cluster_group.GroupAttributes")) {
-		$GroupAttributesFmt = "$cluster_group/GroupAttributes";
-		$found_attr = true;
+		$GroupAttributesFmt = "$cluster_group.GroupAttributes";
+		$found_groupfoot = true;
 	}
 	$PageCSSListFmt["pub/css/$cluster_group.css"] = "$PubDirUrl/css/$cluster_group.css"; 
 	array_pop($groups);
@@ -354,18 +359,8 @@ function ClusterSlice($pagename, $opt) {
 	$name = PageVar($pn,'$Name');
 	$group = PageVar($pn,'$Group');
 
-	# don't add the name if it is an index page and we don't want one
-	$add_name = $opt['name'];
-	$name_is_index = ($name == $group || $name == $DefaultName);
-	if ($opt['noindex'] && $name_is_index)
-	{
-	    $add_name = false;
-	}
-	$parts = ClusterHelper_MapName($group,
-		(($opt['name'] == 'clustered'
-		  && $add_name) ? $name : ''));
-	if ($add_name
-	    && $opt['name'] != 'clustered')
+	$parts = ClusterHelper_MapName($group, ($opt['name'] == 'clustered' ? $name : ''));
+	if ($opt['name'] && $opt['name'] != 'clustered')
 	{
 		// simple name; add name to parts
 		$parts[] = array('name' => $name,
@@ -424,6 +419,16 @@ function ClusterSlice($pagename, $opt) {
 	    {
 		array_pop($parts);
 		$remove--;
+	    }
+	}
+	# remove the last segment if it is an index page and we don't want one
+	if (count($parts) && $opt['noindex'])
+	{
+	    $lastitem = $parts[count($parts) - 1];
+	    if ($lastitem['path'] == "$group.$group"
+		  || $lastitem['path'] == "$group.$DefaultName")
+	    {
+		array_pop($parts);
 	    }
 	}
 
@@ -491,61 +496,6 @@ function ClusterSlice($pagename, $opt) {
 
 	return $out;
 }
-
-/* --------------------------------------------------
- * Cluster "Clean Urls"
- *
- * This needs to (a) redefine the $PageUrl page variable
- * (b) Make its own resolution of page names
-*/
-
-# Redefine the PageUrl to be CleanUrl-like if requested
-function ClusterPageUrl($group, $name) {
-    global $ScriptUrl, $EnablePathInfo,
-	   $ClusterSeparator, $ClusterCleanUrls;
-    if (!$EnablePathInfo)
-    {
-	return PUE("$ScriptUrl?n=$group.$name");
-    }
-    else if ($ClusterCleanUrls)
-    {
-	# replace the group name with something slashed
-	$path = str_replace($ClusterSeparator, '/', $group);
-	return PUE("$ScriptUrl/$path/$name");
-    }
-    else
-    {
-	return PUE("$ScriptUrl/$group/$name");
-    }
-}
-
-# Resolve the page name correctly if ClusterCleanUrls is true
-function ClusterResolvePageName($pagename) {
-    global $ClusterSeparator, $EnablePathInfo, $ClusterCleanUrls;
-    $dirsep = '/';
-    if (strpos($pagename, $dirsep) == false)
-    {
-    	$pagename = ResolvePageName($pagename);
-	return $pagename;
-    }
-    // There are slashes in the name
-    $parts = explode($dirsep, $pagename);
-    if ($parts[count($parts) - 1] == '') array_pop($parts);
-    $name = array_pop($parts);
-    $group = implode($ClusterSeparator, $parts);
-    $pagename = ResolvePageName("$group.$name");
-    // this could be a group-index page
-    if (!PageExists($pagename) and $ClusterCleanUrls)
-    {
-    	$groupindex = "$group$ClusterSeparator$name";
-	$group_page = ResolvePageName($groupindex);
-	if (PageExists($group_page))
-	{
-	    $pagename = $group_page;
-	}
-    }
-    return $pagename;
-} // ClusterResolvePageName
 
 // ------------------------------------------------------------------------
 
